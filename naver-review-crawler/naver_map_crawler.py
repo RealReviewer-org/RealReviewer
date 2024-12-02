@@ -4,6 +4,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.keys import Keys 
 import time
 import json
 import platform
@@ -64,10 +65,42 @@ class NaverMapCrawler:
     def search_places(self, university_name):
         """대학교 주변 식당/카페 검색"""
         results = []
-        base_url = f"https://map.naver.com/p/search/{university_name}%20카페"
+        base_url = f"https://map.naver.com/p/search/{university_name}"
         self.driver.get(base_url)
         time.sleep(3)  # 초기 로딩 대기
+
+        # 검색 결과 iframe 전환
+        if not self.wait_and_switch_to_iframe("#searchIframe"):
+            print("검색 결과 iframe을 찾을 수 없습니다.")
+            return results
+
+        # 지도 iframe으로 전환
+        self.driver.switch_to.default_content()
+    
+        # 줌인 버튼 클릭
+        try:
+            zoom_in = self.driver.find_element(By.CSS_SELECTOR, "button.btn_widget_zoom.zoom_in")
+            zoom_in.click()
+            time.sleep(0.5)
+        except Exception as e:
+            print(f"줌인 실패: {e}")
         
+        # 카페 검색
+        try:
+            zoom_in = self.driver.find_element(By.CSS_SELECTOR, "button.btn_clear")
+            zoom_in.click()
+        
+            search_box = self.driver.find_element(By.CSS_SELECTOR, "input.input_search")
+            search_box.clear()
+            search_box.send_keys("카페")
+            time.sleep(1) 
+
+            search_box.send_keys(Keys.ENTER)
+            time.sleep(2)
+        except Exception as e:
+            print(f"카페 검색 실패: {e}")
+            return results
+
         # 검색 결과 iframe으로 전환
         if not self.wait_and_switch_to_iframe("#searchIframe"):
             print("검색 결과 iframe을 찾을 수 없습니다.")
@@ -176,7 +209,7 @@ class NaverMapCrawler:
                             try:
                                 more_button = self.driver.find_element(By.CSS_SELECTOR, "a.fvwqf")
                                 self.driver.execute_script("arguments[0].click();", more_button)
-                                time.sleep(0.5)
+                                time.sleep(1)
                                 more_button_clicks += 1
                             except:
                                 print("더 이상 불러올 리뷰가 없습니다.")
@@ -234,8 +267,16 @@ class NaverMapCrawler:
         
     def save_to_json(self, data, filename="reviews.json"):
         """결과를 JSON 파일로 저장"""
-        with open(filename, 'w', encoding='utf-8') as f:
+        # review-data 디렉토리 생성
+        save_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "review-data")
+        os.makedirs(save_dir, exist_ok=True)
+        
+        # 파일 경로 생성
+        file_path = os.path.join(save_dir, filename)
+        
+        with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+        return file_path  # 저장된 경로 반환
             
     def close(self):
         """브라우저 종료"""
@@ -249,8 +290,8 @@ def main():
         # 파일명에 학교 이름과 현재 시간 추가
         current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{university_name}_reviews_{current_time}.json"
-        crawler.save_to_json(results, filename)
-        print(f"크롤링이 완료되었습니다. 결과는 {filename} 파일에 저장되었습니다.")
+        saved_path = crawler.save_to_json(results, filename)
+        print(f"크롤링이 완료되었습니다. 결과는 {saved_path} 파일에 저장되었습니다.")
     finally:
         crawler.close()
 

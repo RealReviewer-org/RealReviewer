@@ -11,9 +11,9 @@ high_performance_cafes = FOREACH grouped_by_university {
     sorted_cafes = ORDER data BY avgRating DESC, visitCount DESC, reviewerCount DESC;
     top10_cafes = LIMIT sorted_cafes 10;
     GENERATE group AS university,
-             FLATTEN(top10_cafes.cafeName) AS cafeName,
-             FLATTEN(top10_cafes.avgRating) AS avgRating,
-             FLATTEN(top10_cafes.reviewerCount) AS reviewerCount;
+             top10_cafes.cafeName AS cafeName,
+             top10_cafes.avgRating AS avgRating,
+             top10_cafes.reviewerCount AS reviewerCount;
 };
 STORE high_performance_cafes INTO '/user/maria_dev/realreview/pig/result/high_performance_cafes' USING PigStorage(',');
 
@@ -22,9 +22,9 @@ low_performance_cafes = FOREACH grouped_by_university {
     sorted_cafes = ORDER data BY avgRating ASC, visitCount ASC, reviewerCount ASC;
     bottom10_cafes = LIMIT sorted_cafes 10;
     GENERATE group AS university,
-             FLATTEN(bottom10_cafes.cafeName) AS cafeName,
-             FLATTEN(bottom10_cafes.avgRating) AS avgRating,
-             FLATTEN(bottom10_cafes.reviewerCount) AS reviewerCount;
+             bottom10_cafes.cafeName AS cafeName,
+             bottom10_cafes.avgRating AS avgRating,
+             bottom10_cafes.reviewerCount AS reviewerCount;
 };
 STORE low_performance_cafes INTO '/user/maria_dev/realreview/pig/result/low_performance_cafes' USING PigStorage(',');
 
@@ -33,7 +33,6 @@ high_score_universities = FOREACH grouped_by_university {
     sorted_cafes = ORDER data BY avgRating DESC, visitCount DESC, reviewerCount DESC;
     top10_cafes = LIMIT sorted_cafes 10;
     GENERATE group AS university,
-             FLATTEN(top10_cafes.cafeName) AS cafeName,
              AVG(top10_cafes.avgRating) AS avgRating,
              SUM(top10_cafes.reviewerCount) AS totalReviewCount;
 };
@@ -44,7 +43,6 @@ low_rating_high_visit_universities = FOREACH grouped_by_university {
     sorted_cafes = ORDER data BY avgRating ASC, visitCount DESC, reviewerCount DESC;
     top10_cafes = LIMIT sorted_cafes 10;
     GENERATE group AS university,
-             FLATTEN(top10_cafes.cafeName) AS cafeName,
              AVG(top10_cafes.avgRating) AS avgRating,
              SUM(top10_cafes.reviewerCount) AS totalReviewCount;
 };
@@ -55,7 +53,6 @@ low_rating_low_visit_high_review_universities = FOREACH grouped_by_university {
     sorted_cafes = ORDER data BY avgRating ASC, visitCount ASC, reviewerCount DESC;
     top10_cafes = LIMIT sorted_cafes 10;
     GENERATE group AS university,
-             FLATTEN(top10_cafes.cafeName) AS cafeName,
              AVG(top10_cafes.avgRating) AS avgRating,
              SUM(top10_cafes.reviewerCount) AS totalReviewCount;
 };

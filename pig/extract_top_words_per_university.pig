@@ -1,5 +1,5 @@
 -- CSV 파일을 불러옵니다
-reviews = LOAD '/user/maria_dev/realreview/data/university_cafe_reviews.csv'
+reviews = LOAD '/user/maria_dev/realreview/pig/data/university_cafe_reviews.csv'
            USING PigStorage(',')
            AS (university: chararray, store: chararray, rating: float, review_count: int, review_text: chararray, review_date: chararray, visits: int, tags: chararray);
 

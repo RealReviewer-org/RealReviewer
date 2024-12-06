@@ -1,17 +1,10 @@
-REGISTER '/home/maria_dev/RealReviewer/pig/clean_text.py' USING jython AS myudf;
-
 reviews = LOAD '/user/maria_dev/realreview/merged_data_with_university.csv'
            USING PigStorage(',')
            AS (university: chararray, store: chararray, rating: float, review_count: int, review_text: chararray, review_date: chararray, visits: int, tags: chararray);
 
 university_reviews = FOREACH reviews GENERATE university, review_text;
 
-cleaned_reviews = FOREACH university_reviews GENERATE university, myudf.clean_text(review_text) AS review_text;
-
--- 필터링: 빈 리뷰 텍스트를 제거
-tokenized_reviews = FILTER cleaned_reviews BY review_text IS NOT NULL AND review_text != '';
-
-tokenized_reviews = FOREACH tokenized_reviews GENERATE university, FLATTEN(TOKENIZE(review_text)) AS word;
+tokenized_reviews = FOREACH university_reviews GENERATE university, FLATTEN(TOKENIZE(review_text)) AS word;
 
 grouped_words = GROUP tokenized_reviews BY (university, word);
 

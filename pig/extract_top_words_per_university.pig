@@ -1,4 +1,4 @@
-REGISTER 'clean_text.py' USING jython AS myudf;
+REGISTER '/home/maria_dev/RealReviewer/pig/extract_top_words_per_university.pig' USING jython AS myudf;
 
 reviews = LOAD 'data/merged_data_with_university.csv'
            USING PigStorage(',')

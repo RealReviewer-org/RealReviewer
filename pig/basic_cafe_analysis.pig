@@ -1,5 +1,5 @@
 -- 1. 데이터 로드
-data = LOAD '/user/maria_dev/realreview/pig/data/university_cafe_reviews.csv'
+data = LOAD '/user/maria_dev/realreview/pig/data/cleaned_university_cafe_reviews.csv'
     USING PigStorage(',')
     AS (university:chararray, cafeName:chararray, avgRating:chararray, reviewerCount:chararray, reviewText:chararray, reviewDate:chararray, visitCount:int, tags:chararray);
 

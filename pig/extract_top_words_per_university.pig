@@ -27,4 +27,4 @@ top_words = FOREACH university_grouped {
     GENERATE group AS university, top_50.(word, count);
 };
 
-STORE top_words INTO '/home/maria_dev/RealReviewer/data/top_50_words_per_university' USING PigStorage(',');
+STORE top_words INTO '/user/maria_dev/realreview/pig/data/top_50_words_per_university' USING PigStorage(',');

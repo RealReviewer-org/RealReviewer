@@ -1,6 +1,6 @@
 REGISTER '/home/maria_dev/RealReviewer/pig/extract_top_words_per_university.pig' USING jython AS myudf;
 
-reviews = LOAD 'data/merged_data_with_university.csv'
+reviews = LOAD '/user/maria_dev/realreview/merged_data_with_university.csv'
            USING PigStorage(',')
            AS (university: chararray, store: chararray, rating: float, review_count: int, review_text: chararray, review_date: chararray, visits: int, tags: chararray);
 
@@ -13,14 +13,11 @@ tokenized_reviews = FILTER cleaned_reviews BY review_text IS NOT NULL AND review
 
 tokenized_reviews = FOREACH tokenized_reviews GENERATE university, FLATTEN(TOKENIZE(review_text)) AS word;
 
--- 불용어 제거 (필요한 경우)
-filtered_words = FILTER tokenized_reviews BY word NOT IN ('the', 'and', '이', '그', 'a', 'of', 'in', 'to', 'on', 'at', 'with', 'for', 'by', 'is', 'it');
-
-grouped_words = GROUP filtered_words BY (university, word);
+grouped_words = GROUP tokenized_reviews BY (university, word);
 
 word_counts = FOREACH grouped_words GENERATE
               FLATTEN(group) AS (university, word),
-              COUNT(filtered_words) AS count;
+              COUNT(tokenized_reviews) AS count;
 
 university_grouped = GROUP word_counts BY university;
 

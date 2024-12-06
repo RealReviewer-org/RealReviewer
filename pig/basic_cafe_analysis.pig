@@ -10,14 +10,14 @@ grouped_by_university = GROUP data BY university;
 high_performance_cafes = FOREACH grouped_by_university {
     sorted_cafes = ORDER data BY avgRating DESC, visitCount DESC, reviewerCount DESC;
     top10_cafes = LIMIT sorted_cafes 10;
-    GENERATE group AS university, FLATTEN(top10_cafes);
+    GENERATE group AS university, FLATTEN(FOREACH top10_cafes GENERATE cafeName, avgRating, reviewerCount);
 };
-STORE high_performance_cafes INTO '/user/maria_dev/realreview/pig/result/high_performance_cafes.csv' USING PigStorage(',');
+STORE high_performance_cafes INTO '/user/maria_dev/realreview/pig/result/high_performance_cafes' USING PigStorage(',');
 
 -- 4. 대학별로 평점이 낮고, 재방문수가 낮으며, 리뷰수가 적은 하위 10개 카페 추출
 low_performance_cafes = FOREACH grouped_by_university {
     sorted_cafes = ORDER data BY avgRating ASC, visitCount ASC, reviewerCount ASC;
     bottom10_cafes = LIMIT sorted_cafes 10;
-    GENERATE group AS university, FLATTEN(bottom10_cafes);
+    GENERATE group AS university, FLATTEN(FOREACH bottom10_cafes GENERATE cafeName, avgRating, reviewerCount);
 };
-STORE low_performance_cafes INTO '/user/maria_dev/realreview/pig/result/low_performance_cafes.csv' USING PigStorage(',');
+STORE low_performance_cafes INTO '/user/maria_dev/realreview/pig/result/low_performance_cafes' USING PigStorage(',');

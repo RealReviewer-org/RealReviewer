@@ -1,7 +1,7 @@
 SET default_character_encoding 'UTF-8';
 
 -- 1. 데이터 로드
-data = LOAD '/user/maria_dev/realreview/pig/data/cleaned_university_cafe_reviews.csv'
+data = LOAD '/user/maria_dev/realreview/pig/data/cleaned_university_cafe_reviews_core_columns.csv'
     USING PigStorage(',')
     AS (university:chararray, cafeName:chararray, avgRating:float, reviewerCount:int, visitCount:int);
 

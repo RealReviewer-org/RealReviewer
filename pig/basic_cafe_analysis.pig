@@ -21,25 +21,63 @@ aggregated_cafes = FOREACH grouped_by_university_and_cafe GENERATE
 -- 5. 대학별로 그룹화
 grouped_by_university = GROUP aggregated_cafes BY university;
 
--- 6. 대학별로 평점이 높고, 방문 수가 많으며 리뷰 수가 많은 상위 10개 카페 추출
-high_performance_cafes = FOREACH grouped_by_university {
+-- 6. 8가지 조건에 따른 상위 10개 카페 추출 및 저장
+
+-- 6.1 평점 높음, 방문 수 많음, 리뷰 수 많음
+high_rating_high_visit_high_review_cafes = FOREACH grouped_by_university {
     sorted_cafes = ORDER aggregated_cafes BY avgRating DESC, totalVisitCount DESC, totalReviewerCount DESC;
     top10_cafes = LIMIT sorted_cafes 10;
     GENERATE group AS university,
              FLATTEN(top10_cafes.(cafeName, avgRating, totalReviewerCount, totalVisitCount));
 };
-STORE high_performance_cafes INTO '/user/maria_dev/realreview/pig/result/high_performance_cafes' USING PigStorage(',');
+STORE high_rating_high_visit_high_review_cafes INTO '/user/maria_dev/realreview/pig/result/high_rating_high_visit_high_review_cafes' USING PigStorage(',');
 
--- 7. 대학별로 평점이 낮고, 방문 수가 많으며 리뷰 수가 많은 상위 10개 카페 추출
-low_rating_high_visit_cafes = FOREACH grouped_by_university {
+-- 6.2 평점 높음, 방문 수 많음, 리뷰 수 적음
+high_rating_high_visit_low_review_cafes = FOREACH grouped_by_university {
+    sorted_cafes = ORDER aggregated_cafes BY avgRating DESC, totalVisitCount DESC, totalReviewerCount ASC;
+    top10_cafes = LIMIT sorted_cafes 10;
+    GENERATE group AS university,
+             FLATTEN(top10_cafes.(cafeName, avgRating, totalReviewerCount, totalVisitCount));
+};
+STORE high_rating_high_visit_low_review_cafes INTO '/user/maria_dev/realreview/pig/result/high_rating_high_visit_low_review_cafes' USING PigStorage(',');
+
+-- 6.3 평점 높음, 방문 수 적음, 리뷰 수 많음
+high_rating_low_visit_high_review_cafes = FOREACH grouped_by_university {
+    sorted_cafes = ORDER aggregated_cafes BY avgRating DESC, totalVisitCount ASC, totalReviewerCount DESC;
+    top10_cafes = LIMIT sorted_cafes 10;
+    GENERATE group AS university,
+             FLATTEN(top10_cafes.(cafeName, avgRating, totalReviewerCount, totalVisitCount));
+};
+STORE high_rating_low_visit_high_review_cafes INTO '/user/maria_dev/realreview/pig/result/high_rating_low_visit_high_review_cafes' USING PigStorage(',');
+
+-- 6.4 평점 높음, 방문 수 적음, 리뷰 수 적음
+high_rating_low_visit_low_review_cafes = FOREACH grouped_by_university {
+    sorted_cafes = ORDER aggregated_cafes BY avgRating DESC, totalVisitCount ASC, totalReviewerCount ASC;
+    top10_cafes = LIMIT sorted_cafes 10;
+    GENERATE group AS university,
+             FLATTEN(top10_cafes.(cafeName, avgRating, totalReviewerCount, totalVisitCount));
+};
+STORE high_rating_low_visit_low_review_cafes INTO '/user/maria_dev/realreview/pig/result/high_rating_low_visit_low_review_cafes' USING PigStorage(',');
+
+-- 6.5 평점 낮음, 방문 수 많음, 리뷰 수 많음
+low_rating_high_visit_high_review_cafes = FOREACH grouped_by_university {
     sorted_cafes = ORDER aggregated_cafes BY avgRating ASC, totalVisitCount DESC, totalReviewerCount DESC;
     top10_cafes = LIMIT sorted_cafes 10;
     GENERATE group AS university,
              FLATTEN(top10_cafes.(cafeName, avgRating, totalReviewerCount, totalVisitCount));
 };
-STORE low_rating_high_visit_cafes INTO '/user/maria_dev/realreview/pig/result/low_rating_high_visit_cafes' USING PigStorage(',');
+STORE low_rating_high_visit_high_review_cafes INTO '/user/maria_dev/realreview/pig/result/low_rating_high_visit_high_review_cafes' USING PigStorage(',');
 
--- 8. 대학별로 평점이 낮고, 방문 수가 적으며 리뷰 수가 많은 상위 10개 카페 추출
+-- 6.6 평점 낮음, 방문 수 많음, 리뷰 수 적음
+low_rating_high_visit_low_review_cafes = FOREACH grouped_by_university {
+    sorted_cafes = ORDER aggregated_cafes BY avgRating ASC, totalVisitCount DESC, totalReviewerCount ASC;
+    top10_cafes = LIMIT sorted_cafes 10;
+    GENERATE group AS university,
+             FLATTEN(top10_cafes.(cafeName, avgRating, totalReviewerCount, totalVisitCount));
+};
+STORE low_rating_high_visit_low_review_cafes INTO '/user/maria_dev/realreview/pig/result/low_rating_high_visit_low_review_cafes' USING PigStorage(',');
+
+-- 6.7 평점 낮음, 방문 수 적음, 리뷰 수 많음
 low_rating_low_visit_high_review_cafes = FOREACH grouped_by_university {
     sorted_cafes = ORDER aggregated_cafes BY avgRating ASC, totalVisitCount ASC, totalReviewerCount DESC;
     top10_cafes = LIMIT sorted_cafes 10;
@@ -47,3 +85,12 @@ low_rating_low_visit_high_review_cafes = FOREACH grouped_by_university {
              FLATTEN(top10_cafes.(cafeName, avgRating, totalReviewerCount, totalVisitCount));
 };
 STORE low_rating_low_visit_high_review_cafes INTO '/user/maria_dev/realreview/pig/result/low_rating_low_visit_high_review_cafes' USING PigStorage(',');
+
+-- 6.8 평점 낮음, 방문 수 적음, 리뷰 수 적음
+low_rating_low_visit_low_review_cafes = FOREACH grouped_by_university {
+    sorted_cafes = ORDER aggregated_cafes BY avgRating ASC, totalVisitCount ASC, totalReviewerCount ASC;
+    top10_cafes = LIMIT sorted_cafes 10;
+    GENERATE group AS university,
+             FLATTEN(top10_cafes.(cafeName, avgRating, totalReviewerCount, totalVisitCount));
+};
+STORE low_rating_low_visit_low_review_cafes INTO '/user/maria_dev/realreview/pig/result/low_rating_low_visit_low_review_cafes' USING PigStorage(',');

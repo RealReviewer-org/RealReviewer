@@ -2,9 +2,8 @@
 SET default_character_encoding 'UTF-8';
 
 -- 입력 및 출력 경로 설정 (카테고리를 동적으로 받음)
-%declare category 'low_rating_low_visit_low_review_cafes'
-%declare input_path '/user/maria_dev/realreview/pig/result/$category/${category}_processed_text.txt'
-%declare output_path '/user/maria_dev/realreview/pig/result/$category/word_frequencies'
+%declare input_path '/user/maria_dev/realreview/pig/result/${category}/${category}_processed_text.txt'
+%declare output_path '/user/maria_dev/realreview/pig/result/${category}/word_frequencies'
 
 -- 텍스트 데이터 로드
 reviews = LOAD '$input_path' USING TextLoader() AS (line:chararray);

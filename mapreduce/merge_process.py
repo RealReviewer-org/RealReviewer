@@ -1,84 +1,62 @@
 import pandas as pd
 from konlpy.tag import Okt
-import subprocess
 from mrjob.job import MRJob
 from collections import Counter
 import csv
 
 # 리뷰 데이터 전처리 함수
 def preprocess_reviews(input_file, university_name, keyword, output_file):
-    """
-    리뷰 데이터를 전처리하고, 대학명과 키워드에 따라 필터링하여 저장하는 함수.
-
-    Args:
-        input_file (str): 입력 CSV 파일 경로
-        university_name (str): 필터링할 대학명
-        keyword (str): 필터링할 키워드
-        output_file (str): 출력 CSV 파일 경로
-    """
-    okt = Okt()  # 한국어 형태소 분석기 객체 생성
+    okt = Okt()
     df = pd.read_csv(input_file)
 
-    # 열 이름을 영어로 재설정
     df.columns = [
         'university_name', 'shop_name', 'shop_avg_rating',
         'reviewer_review_count', 'review_text', 'review_date',
         'shop_visit_count', 'tags'
     ]
 
-    # 리뷰 텍스트를 형태소 분석 후 명사, 동사, 형용사, 부사만 필터링
     def process_text(text):
         if not isinstance(text, str):
             return ""
-        tokens = okt.pos(text, stem=True)  # 형태소 분석 및 원형 복원
+        tokens = okt.pos(text, stem=True)
         filtered_tokens = [word for word, pos in tokens if pos in ['Noun', 'Verb', 'Adjective', 'Adverb']]
         return " ".join(filtered_tokens)
 
-    # 전처리된 리뷰 데이터를 새로운 열로 추가
     df['processed_review'] = df['review_text'].apply(process_text)
 
-    # 대학명으로 필터링
     university_filtered = df[df['university_name'] == university_name]
     if university_filtered.empty:
         print(f"해당 대학({university_name})의 데이터가 없습니다.")
         return
 
-    # 키워드로 필터링
     keyword_filtered = university_filtered[university_filtered['processed_review'].str.contains(keyword, na=False)]
     if keyword_filtered.empty:
         print(f"키워드({keyword})와 관련된 데이터가 없습니다.")
         return
 
-    # 결과 데이터 저장 (선택된 열만 포함)
-    result = keyword_filtered[['university_name', 'shop_name', 'processed_review']]
-    result['keyword'] = keyword
+    # 복사본 생성 및 명시적 설정
+    result = keyword_filtered[['university_name', 'shop_name', 'processed_review']].copy()
+    result.loc[:, 'keyword'] = keyword
     result.to_csv(output_file, index=False, encoding='utf-8-sig')
     print(f"필터링된 데이터가 저장되었습니다: {output_file}")
 
 # 리뷰 감정 분석 MapReduce 클래스
 class SentimentAnalysisMR(MRJob):
-    """
-    리뷰 데이터의 감정 분석을 수행하는 MapReduce 클래스.
-    """
-
     def configure_args(self):
         super(SentimentAnalysisMR, self).configure_args()
         self.add_file_arg('--sentiment-dict', help='감정 사전 파일 경로')
 
     def load_sentiment_dict(self):
-        """
-        감정 사전을 로드하는 함수.
-        """
         sentiment_data = pd.read_csv(self.options.sentiment_dict, sep='\t', header=None, names=['word', 'polarity'])
         return sentiment_data.set_index('word')['polarity'].to_dict()
 
     def mapper_init(self):
         self.sentiment_dict = self.load_sentiment_dict()
 
+    def reducer_init(self):
+        self.sentiment_dict = self.load_sentiment_dict()
+
     def mapper(self, _, line):
-        """
-        리뷰 데이터를 처리하여 감정 점수를 계산하는 Mapper 함수.
-        """
         parts = line.strip().split(",")
         if len(parts) < 4:
             return
@@ -102,9 +80,6 @@ class SentimentAnalysisMR(MRJob):
         yield shop_name, (dominant_sentiment, review_text)
 
     def reducer(self, shop_name, values):
-        """
-        감정 분석 결과를 합산하여 최종 결과를 출력하는 Reducer 함수.
-        """
         sentiment_counts = {"Positive": 0, "Negative": 0, "Neutral": 0}
         keyword_counter = {"Positive": Counter(), "Negative": Counter(), "Neutral": Counter()}
 
@@ -131,9 +106,6 @@ class SentimentAnalysisMR(MRJob):
         }
 
 def save_results_to_csv(output_file, results):
-    """
-    감정 분석 결과를 CSV 파일로 저장하는 함수.
-    """
     with open(output_file, mode="w", encoding="utf-8-sig", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["Shop Name", "Positive (%)", "Neutral (%)", "Negative (%)",
@@ -177,8 +149,8 @@ def main():
     mr_job = SentimentAnalysisMR(args=[args.preprocessed, '--sentiment-dict={}'.format(args.sentiment_dict)])
     with mr_job.make_runner() as runner:
         runner.run()
-        for line in runner.stream_output():
-            key, value = mr_job.parse_output_line(line)
+        # 수정: parse_output 사용
+        for key, value in mr_job.parse_output(runner.cat_output()):
             results.append((key, value))
 
     # Step 3: 결과 CSV로 저장

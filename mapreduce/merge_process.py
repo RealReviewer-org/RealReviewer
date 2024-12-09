@@ -80,6 +80,9 @@ class SentimentAnalysisMR(MRJob):
         yield shop_name, (dominant_sentiment, review_text)
 
     def reducer(self, shop_name, values):
+        """
+        감정 분석 결과를 합산하여 최종 결과를 출력하는 Reducer 함수.
+        """
         sentiment_counts = {"Positive": 0, "Negative": 0, "Neutral": 0}
         keyword_counter = {"Positive": Counter(), "Negative": Counter(), "Neutral": Counter()}
 
@@ -98,7 +101,28 @@ class SentimentAnalysisMR(MRJob):
 
         total_reviews = sum(sentiment_counts.values())
         sentiment_ratios = {k: round(v / total_reviews * 100, 2) for k, v in sentiment_counts.items()}
-        top_keywords = {k: [kw for kw, _ in keyword_counter[k].most_common(3)] for k in keyword_counter}
+
+        # 상위 키워드 추출 로직 수정: 리뷰 감정에 따른 키워드 필터링
+        if sentiment_ratios.get("Positive", 0) == 100.0:
+            # 100% 긍정 리뷰일 경우 부정 및 중립 키워드 제거
+            top_keywords = {
+                "Positive": [kw for kw, _ in keyword_counter["Positive"].most_common(3)],
+                "Neutral": [],
+                "Negative": []
+            }
+        elif sentiment_ratios.get("Negative", 0) == 100.0:
+            # 100% 부정 리뷰일 경우 긍정 및 중립 키워드 제거
+            top_keywords = {
+                "Positive": [],
+                "Neutral": [],
+                "Negative": [kw for kw, _ in keyword_counter["Negative"].most_common(3)],
+            }
+        else:
+            # 혼합된 리뷰일 경우 각 감정별 상위 키워드 추출
+            top_keywords = {
+                k: [kw for kw, _ in keyword_counter[k].most_common(3)]
+                for k in keyword_counter
+            }
 
         yield shop_name, {
             "Sentiment Ratios": sentiment_ratios,

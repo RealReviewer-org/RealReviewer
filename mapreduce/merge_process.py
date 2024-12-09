@@ -130,12 +130,18 @@ class SentimentAnalysisMR(MRJob):
         }
 
 def save_results_to_csv(output_file, results):
+    """
+    감정 분석 결과를 CSV 파일로 저장하며, 긍정 퍼센트 순으로 정렬.
+    """
+    # 정렬된 결과 리스트 생성
+    sorted_results = sorted(results, key=lambda x: x[1]["Sentiment Ratios"].get("Positive", 0), reverse=True)
+
     with open(output_file, mode="w", encoding="utf-8-sig", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["Shop Name", "Positive (%)", "Neutral (%)", "Negative (%)",
                          "Top Positive Keywords", "Top Neutral Keywords", "Top Negative Keywords"])
 
-        for shop_name, data in results:
+        for shop_name, data in sorted_results:
             sentiment_ratios = data["Sentiment Ratios"]
             top_keywords = data["Top Keywords"]
             writer.writerow([

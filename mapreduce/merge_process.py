@@ -106,7 +106,7 @@ class SentimentAnalysisMR(MRJob):
         if sentiment_ratios.get("Positive", 0) == 100.0:
             # 100% 긍정 리뷰일 경우 부정 및 중립 키워드 제거
             top_keywords = {
-                "Positive": [kw for kw, _ in keyword_counter["Positive"].most_common(3)],
+                "Positive": [kw for kw, _ in keyword_counter["Positive"].most_common(6)],
                 "Neutral": [],
                 "Negative": []
             }
@@ -115,12 +115,12 @@ class SentimentAnalysisMR(MRJob):
             top_keywords = {
                 "Positive": [],
                 "Neutral": [],
-                "Negative": [kw for kw, _ in keyword_counter["Negative"].most_common(3)],
+                "Negative": [kw for kw, _ in keyword_counter["Negative"].most_common(6)],
             }
         else:
             # 혼합된 리뷰일 경우 각 감정별 상위 키워드 추출
             top_keywords = {
-                k: [kw for kw, _ in keyword_counter[k].most_common(3)]
+                k: [kw for kw, _ in keyword_counter[k].most_common(6)]
                 for k in keyword_counter
             }
 

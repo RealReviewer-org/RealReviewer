@@ -3,6 +3,8 @@ from konlpy.tag import Okt
 from mrjob.job import MRJob
 from collections import Counter
 import csv
+import argparse
+import sys
 
 # 리뷰 데이터 전처리 함수
 def preprocess_reviews(input_file, university_name, keyword, output_file):
@@ -26,114 +28,73 @@ def preprocess_reviews(input_file, university_name, keyword, output_file):
 
     university_filtered = df[df['university_name'] == university_name]
     if university_filtered.empty:
-        print(f"해당 대학({university_name})의 데이터가 없습니다.")
-        return
+        print(f"해당 대학({university_name})의 데이터가 없습니다.", file=sys.stderr)
+        sys.exit(1)
 
     keyword_filtered = university_filtered[university_filtered['processed_review'].str.contains(keyword, na=False)]
     if keyword_filtered.empty:
-        print(f"키워드({keyword})와 관련된 데이터가 없습니다.")
-        return
+        print(f"키워드({keyword})와 관련된 데이터가 없습니다.", file=sys.stderr)
+        sys.exit(1)
 
-    # 복사본 생성 및 명시적 설정
+    # 결과 저장
     result = keyword_filtered[['university_name', 'shop_name', 'processed_review']].copy()
     result.loc[:, 'keyword'] = keyword
     result.to_csv(output_file, index=False, encoding='utf-8-sig')
-    print(f"필터링된 데이터가 저장되었습니다: {output_file}")
+    print(f"전처리된 데이터가 저장되었습니다: {output_file}")
 
-# 리뷰 감정 분석 MapReduce 클래스
+# 리뷰 감성 분석 MapReduce 클래스
 class SentimentAnalysisMR(MRJob):
     def configure_args(self):
         super(SentimentAnalysisMR, self).configure_args()
         self.add_file_arg('--sentiment-dict', help='감정 사전 파일 경로')
 
+    def mapper_init(self):
+        # 감정 사전 로드 및 형태소 분석기 초기화
+        self.sentiment_dict = self.load_sentiment_dict()
+        self.okt = Okt()
+
     def load_sentiment_dict(self):
         sentiment_data = pd.read_csv(self.options.sentiment_dict, sep='\t', header=None, names=['word', 'polarity'])
         return sentiment_data.set_index('word')['polarity'].to_dict()
 
-    def mapper_init(self):
-        self.sentiment_dict = self.load_sentiment_dict()
-
-    def reducer_init(self):
-        self.sentiment_dict = self.load_sentiment_dict()
-
     def mapper(self, _, line):
         parts = line.strip().split(",")
-        if len(parts) < 4:
+        if len(parts) < 3:
             return
         shop_name, review_text = parts[1], parts[2]
 
         if not isinstance(review_text, str):
             return
-        words = review_text.split()
-        sentiment_scores = {"Positive": 0, "Negative": 0, "Neutral": 0}
-        for word in words:
-            if word in self.sentiment_dict:
-                polarity = int(self.sentiment_dict[word])
-                if polarity > 0:
-                    sentiment_scores["Positive"] += 1
-                elif polarity < 0:
-                    sentiment_scores["Negative"] += 1
-                else:
-                    sentiment_scores["Neutral"] += 1
+        tokens = self.okt.pos(review_text, stem=True)
+        filtered_tokens = [word for word, pos in tokens if word in self.sentiment_dict]
 
-        dominant_sentiment = max(sentiment_scores, key=sentiment_scores.get)
-        yield shop_name, (dominant_sentiment, review_text)
+        for word in filtered_tokens:
+            polarity = self.sentiment_dict[word]
+            sentiment = "Positive" if polarity > 0 else "Negative" if polarity < 0 else "Neutral"
+            yield shop_name, (sentiment, word)
 
     def reducer(self, shop_name, values):
-        """
-        감정 분석 결과를 합산하여 최종 결과를 출력하는 Reducer 함수.
-        """
-        sentiment_counts = {"Positive": 0, "Negative": 0, "Neutral": 0}
+        sentiment_counts = Counter()
         keyword_counter = {"Positive": Counter(), "Negative": Counter(), "Neutral": Counter()}
 
-        for sentiment, review_text in values:
+        for sentiment, word in values:
             sentiment_counts[sentiment] += 1
-            words = review_text.split()
-            for word in words:
-                if word in self.sentiment_dict:
-                    polarity = int(self.sentiment_dict[word])
-                    if polarity > 0:
-                        keyword_counter["Positive"][word] += 1
-                    elif polarity < 0:
-                        keyword_counter["Negative"][word] += 1
-                    else:
-                        keyword_counter["Neutral"][word] += 1
+            keyword_counter[sentiment][word] += 1
 
         total_reviews = sum(sentiment_counts.values())
         sentiment_ratios = {k: round(v / total_reviews * 100, 2) for k, v in sentiment_counts.items()}
-
-        # 상위 키워드 추출 로직 수정: 리뷰 감정에 따른 키워드 필터링
-        if sentiment_ratios.get("Positive", 0) == 100.0:
-            # 100% 긍정 리뷰일 경우 부정 및 중립 키워드 제거
-            top_keywords = {
-                "Positive": [kw for kw, _ in keyword_counter["Positive"].most_common(6)],
-                "Neutral": [],
-                "Negative": []
-            }
-        elif sentiment_ratios.get("Negative", 0) == 100.0:
-            # 100% 부정 리뷰일 경우 긍정 및 중립 키워드 제거
-            top_keywords = {
-                "Positive": [],
-                "Neutral": [],
-                "Negative": [kw for kw, _ in keyword_counter["Negative"].most_common(6)],
-            }
-        else:
-            # 혼합된 리뷰일 경우 각 감정별 상위 키워드 추출
-            top_keywords = {
-                k: [kw for kw, _ in keyword_counter[k].most_common(6)]
-                for k in keyword_counter
-            }
+        top_keywords = {
+            k: [word for word, _ in keyword_counter[k].most_common(6)]
+            for k in keyword_counter
+        }
 
         yield shop_name, {
             "Sentiment Ratios": sentiment_ratios,
             "Top Keywords": top_keywords
         }
 
+# 결과 저장 함수
 def save_results_to_csv(output_file, results):
-    """
-    감정 분석 결과를 CSV 파일로 저장하며, 긍정 퍼센트 순으로 정렬.
-    """
-    # 정렬된 결과 리스트 생성
     sorted_results = sorted(results, key=lambda x: x[1]["Sentiment Ratios"].get("Positive", 0), reverse=True)
 
     with open(output_file, mode="w", encoding="utf-8-sig", newline="") as file:
@@ -153,14 +114,11 @@ def save_results_to_csv(output_file, results):
                 ", ".join(top_keywords.get("Neutral", [])),
                 ", ".join(top_keywords.get("Negative", []))
             ])
-    print("결과가 저장되었습니다: {}".format(output_file))
+    print(f"결과가 저장되었습니다: {output_file}")
 
+# 실행 함수
 def main():
-    """
-    리뷰 데이터 전처리 및 감정 분석 작업의 전체 흐름을 실행하는 함수.
-    """
-    import argparse
-    parser = argparse.ArgumentParser(description="카페 리뷰 감정 분석 도구")
+    parser = argparse.ArgumentParser(description="카페 리뷰 감성 분석 도구")
     parser.add_argument('--input', required=True, help="입력 리뷰 CSV 파일 경로")
     parser.add_argument('--university', required=True, help="필터링할 대학 이름")
     parser.add_argument('--keyword', required=True, help="필터링할 키워드")
@@ -169,21 +127,18 @@ def main():
     parser.add_argument('--preprocessed', default="filtered_reviews.csv", help="전처리된 CSV 파일 저장 경로")
     args = parser.parse_args()
 
-    # Step 1: 리뷰 데이터 전처리
-    print("\n리뷰 데이터를 전처리 중...")
+    print("\nStep 1: 리뷰 데이터를 전처리 중...")
     preprocess_reviews(args.input, args.university, args.keyword, args.preprocessed)
 
-    # Step 2: MapReduce를 이용한 감정 분석 실행
-    print("\nMapReduce를 이용한 감정 분석을 시작합니다...")
+    print("\nStep 2: MapReduce를 이용한 감정 분석 실행 중...")
     results = []
     mr_job = SentimentAnalysisMR(args=[args.preprocessed, '--sentiment-dict={}'.format(args.sentiment_dict)])
     with mr_job.make_runner() as runner:
         runner.run()
-        # 수정: parse_output 사용
         for key, value in mr_job.parse_output(runner.cat_output()):
             results.append((key, value))
 
-    # Step 3: 결과 CSV로 저장
+    print("\nStep 3: 분석 결과를 저장 중...")
     save_results_to_csv(args.result, results)
 
 if __name__ == "__main__":
